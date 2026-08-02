@@ -15,7 +15,7 @@ Double-click `run.bat` for automatic environment setup and startup.
 To run manually:
 
 ```powershell
-cd electrical_calculator
+cd electrical-calculator
 python -m pip install -r requirements.txt
 python main.py
 ```
