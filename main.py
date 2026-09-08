@@ -7,7 +7,7 @@ from rich.console import Console
 
 from calculator import CalculationResult, ElectricalCalculator
 from constants import AppAction, MenuSignal, OhmsLawAction, OHM_SYMBOL
-from menu import ArrowMenu, MenuOption, WindowsKeyReader
+from menu import ArrowMenu, MenuOption, create_key_reader
 from ui import ApplicationExit, NavigationBack, TerminalUI
 from utils import InputValidationError, parse_number, parse_number_list
 
@@ -17,7 +17,7 @@ class ElectricalCalculatorApp:
 
     def __init__(self) -> None:
         self.console = Console(highlight=False)
-        self.key_reader = WindowsKeyReader()
+        self.key_reader = create_key_reader()
         self.ui = TerminalUI(self.console, self.key_reader)
         self.calculator = ElectricalCalculator()
 

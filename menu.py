@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 import os
+import sys
 from typing import Generic, Protocol, Sequence, TypeVar
 
 from rich.console import Console
@@ -13,6 +14,15 @@ try:
     import msvcrt
 except ImportError:  # pragma: no cover - this application targets Windows
     msvcrt = None  # type: ignore[assignment]
+
+try:
+    import select
+    import termios
+    import tty
+except ImportError:  # pragma: no cover - only available on POSIX
+    select = None  # type: ignore[assignment]
+    termios = None  # type: ignore[assignment]
+    tty = None  # type: ignore[assignment]
 
 
 T = TypeVar("T")
@@ -44,6 +54,13 @@ class MenuOption(Generic[T]):
 
     label: str
     value: T
+
+
+class KeyReader(Protocol):
+    """Presentation-neutral keyboard reader contract."""
+
+    def read_key(self) -> KeyPress:
+        """Block until one complete key press is available."""
 
 
 class WindowsKeyReader:
@@ -89,13 +106,140 @@ class WindowsKeyReader:
             return KeyPress(Key.CHARACTER, character)
         return KeyPress(Key.UNKNOWN)
 
+
+class PosixKeyReader:
+    """Read individual keys from POSIX (Linux/macOS) terminals."""
+
+    _ESCAPE_MAP = {
+        b"\x1b[A": Key.UP,
+        b"\x1bOA": Key.UP,
+        b"\x1b[B": Key.DOWN,
+        b"\x1bOB": Key.DOWN,
+        b"\x1b[C": Key.RIGHT,
+        b"\x1bOC": Key.RIGHT,
+        b"\x1b[D": Key.LEFT,
+        b"\x1bOD": Key.LEFT,
+        b"\x1b[H": Key.HOME,
+        b"\x1bOH": Key.HOME,
+        b"\x1b[1~": Key.HOME,
+        b"\x1b[7~": Key.HOME,
+        b"\x1b[F": Key.END,
+        b"\x1bOF": Key.END,
+        b"\x1b[4~": Key.END,
+        b"\x1b[8~": Key.END,
+        b"\x1b[3~": Key.DELETE,
+        b"\x1b[Z": Key.TAB,
+    }
+
+    _SINGLE_KEY_MAP = {
+        b"\r": Key.ENTER,
+        b"\n": Key.ENTER,
+        b"\x08": Key.BACKSPACE,
+        b"\x7f": Key.BACKSPACE,
+        b"\t": Key.TAB,
+        b"\x03": Key.CTRL_C,
+    }
+
+    def __init__(self) -> None:
+        if os.name != "posix" or termios is None or tty is None or select is None:
+            raise RuntimeError("This reader requires a POSIX terminal.")
+
+    def read_key(self) -> KeyPress:
+        """Block until one complete key press is available."""
+
+        fd = sys.stdin.fileno()
+        is_tty = sys.stdin.isatty()
+        old_settings = None
+
+        if is_tty:
+            old_settings = termios.tcgetattr(fd)
+            tty.setraw(fd, termios.TCSANOW)
+
+        try:
+            raw = os.read(fd, 1)
+            if not raw:
+                return KeyPress(Key.CTRL_C)
+
+            if raw == b"\x1b":
+                seq = b""
+                while True:
+                    rlist, _, _ = select.select([fd], [], [], 0.05)
+                    if not rlist:
+                        break
+                    chunk = os.read(fd, 32)
+                    if not chunk:
+                        break
+                    seq += chunk
+                    if seq.startswith((b"[", b"O")):
+                        if len(seq) >= 2 and (0x40 <= seq[-1] <= 0x7E):
+                            break
+                    else:
+                        break
+
+                if not seq:
+                    return KeyPress(Key.ESCAPE)
+
+                full_seq = raw + seq
+                if full_seq in self._ESCAPE_MAP:
+                    return KeyPress(self._ESCAPE_MAP[full_seq])
+
+                if full_seq.startswith(b"\x1b[") and full_seq.endswith(b"A"):
+                    return KeyPress(Key.UP)
+                if full_seq.startswith(b"\x1b[") and full_seq.endswith(b"B"):
+                    return KeyPress(Key.DOWN)
+                if full_seq.startswith(b"\x1b[") and full_seq.endswith(b"C"):
+                    return KeyPress(Key.RIGHT)
+                if full_seq.startswith(b"\x1b[") and full_seq.endswith(b"D"):
+                    return KeyPress(Key.LEFT)
+
+                return KeyPress(Key.UNKNOWN)
+
+            if raw in self._SINGLE_KEY_MAP:
+                return KeyPress(self._SINGLE_KEY_MAP[raw])
+
+            first_byte = raw[0]
+            extra_len = 0
+            if (first_byte & 0xE0) == 0xC0:
+                extra_len = 1
+            elif (first_byte & 0xF0) == 0xE0:
+                extra_len = 2
+            elif (first_byte & 0xF8) == 0xF0:
+                extra_len = 3
+
+            if extra_len > 0:
+                extra_bytes = os.read(fd, extra_len)
+                raw += extra_bytes
+
+            try:
+                char = raw.decode("utf-8")
+                if char.isprintable():
+                    return KeyPress(Key.CHARACTER, char)
+            except UnicodeDecodeError:
+                pass
+
+            return KeyPress(Key.UNKNOWN)
+        finally:
+            if is_tty and old_settings is not None:
+                termios.tcsetattr(fd, termios.TCSANOW, old_settings)
+
+
+def create_key_reader() -> KeyReader:
+    """Create a platform-appropriate keyboard reader."""
+
+    if os.name == "nt":
+        return WindowsKeyReader()
+    if os.name == "posix":
+        return PosixKeyReader()
+    raise RuntimeError(f"Unsupported operating system: {os.name}")
+
+
 class ArrowMenu(Generic[T]):
     """Render and operate a keyboard-driven terminal menu."""
 
     def __init__(
         self,
         console: Console,
-        key_reader: WindowsKeyReader,
+        key_reader: KeyReader,
         title: str,
         options: Sequence[MenuOption[T]],
         *,

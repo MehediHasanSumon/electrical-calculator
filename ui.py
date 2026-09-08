@@ -20,7 +20,7 @@ from constants import (
     SEPARATOR_WIDTH,
     Styles,
 )
-from menu import ArrowMenu, KeyPress, MenuOption, WindowsKeyReader
+from menu import ArrowMenu, KeyPress, KeyReader, MenuOption, WindowsKeyReader
 
 
 class NavigationBack(Exception):
@@ -37,7 +37,7 @@ class TerminalUI:
     def __init__(
         self,
         console: Console,
-        key_reader: WindowsKeyReader,
+        key_reader: KeyReader,
     ) -> None:
         just_fix_windows_console()
         self.console = console
