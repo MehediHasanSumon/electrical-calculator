@@ -54,6 +54,7 @@ class MenuOption(Generic[T]):
 
     label: str
     value: T
+    description: str = ""
 
 
 class KeyReader(Protocol):
@@ -288,10 +289,30 @@ class ArrowMenu(Generic[T]):
                 return MenuSignal.QUIT
 
     @staticmethod
-    def option_text(label: str, selected: bool) -> Text:
+    def option_text(
+        option_or_label: "MenuOption[object] | str",
+        selected: bool,
+        description: str = "",
+    ) -> Text:
         """Build consistently styled text for a menu option."""
 
-        prefix = "\u25ba " if selected else "  "
-        text = Text(f"{prefix}{label}")
-        text.stylize(Styles.SELECTED if selected else Styles.NORMAL)
+        if isinstance(option_or_label, str):
+            label = option_or_label
+            desc = description
+        else:
+            label = option_or_label.label
+            desc = option_or_label.description or description
+
+        text = Text()
+        if selected:
+            text.append(" ► ", style="bold bright_cyan")
+            text.append(f" {label:<24} ", style=Styles.SELECTED)
+            if desc:
+                text.append(f"  {desc}", style=Styles.SELECTED_DESC)
+        else:
+            text.append("   ", style="default")
+            text.append(f" {label:<24} ", style=Styles.NORMAL)
+            if desc:
+                text.append(f"  {desc}", style=Styles.NORMAL_DESC)
+
         return text

@@ -43,12 +43,36 @@ class ElectricalCalculatorApp:
             self.key_reader,
             "MAIN MENU",
             (
-                MenuOption("Series Resistance", AppAction.SERIES),
-                MenuOption("Parallel Resistance", AppAction.PARALLEL),
-                MenuOption("Ohm's Law", AppAction.OHMS_LAW),
-                MenuOption("Clear Screen", AppAction.CLEAR),
-                MenuOption("Help", AppAction.HELP),
-                MenuOption("Exit", AppAction.EXIT),
+                MenuOption(
+                    "Series Resistance",
+                    AppAction.SERIES,
+                    description="Req = R₁ + R₂ + ...",
+                ),
+                MenuOption(
+                    "Parallel Resistance",
+                    AppAction.PARALLEL,
+                    description="1/Req = 1/R₁ + 1/R₂ + ...",
+                ),
+                MenuOption(
+                    "Ohm's Law Suite",
+                    AppAction.OHMS_LAW,
+                    description="V, I, R & Power equations",
+                ),
+                MenuOption(
+                    "Clear Screen",
+                    AppAction.CLEAR,
+                    description="Clean terminal workspace",
+                ),
+                MenuOption(
+                    "Help & Formulas",
+                    AppAction.HELP,
+                    description="Shortcuts & physics guide",
+                ),
+                MenuOption(
+                    "Exit Calculator",
+                    AppAction.EXIT,
+                    description="Quit the application",
+                ),
             ),
             allow_back=False,
         )
@@ -73,7 +97,9 @@ class ElectricalCalculatorApp:
             "SERIES RESISTANCE",
             minimum=0,
             instructions=(
-                "Enter = Calculate  |  Esc = Back  |  Q = Exit",
+                "Formula: Req = R₁ + R₂ + R₃ + ...",
+                f"Enter resistor values in ohms ({OHM_SYMBOL}) separated by commas (e.g. 10, 22.5, 47)",
+                "Controls: Enter = Calculate  |  Esc = Back  |  Q = Exit",
             ),
         )
         result = self.calculator.series_resistance(resistors)
@@ -85,7 +111,9 @@ class ElectricalCalculatorApp:
             minimum=0,
             minimum_inclusive=False,
             instructions=(
-                "Enter = Calculate  |  Esc = Back  |  Q = Exit",
+                "Formula: 1/Req = 1/R₁ + 1/R₂ + 1/R₃ + ...",
+                f"Enter branch values in ohms ({OHM_SYMBOL}) separated by commas (values must be > 0)",
+                "Controls: Enter = Calculate  |  Esc = Back  |  Q = Exit",
             ),
         )
         result = self.calculator.parallel_resistance(resistors)
@@ -114,14 +142,28 @@ class ElectricalCalculatorApp:
         menu = ArrowMenu(
             self.console,
             self.key_reader,
-            "OHM'S LAW",
+            "OHM'S LAW SUITE",
             (
-                MenuOption("Calculate Voltage (V)", OhmsLawAction.VOLTAGE),
-                MenuOption("Calculate Current (I)", OhmsLawAction.CURRENT),
                 MenuOption(
-                    "Calculate Resistance (R)", OhmsLawAction.RESISTANCE
+                    "Voltage (V)",
+                    OhmsLawAction.VOLTAGE,
+                    description="Calculate V = I × R",
                 ),
-                MenuOption("Calculate Power (P)", OhmsLawAction.POWER),
+                MenuOption(
+                    "Current (I)",
+                    OhmsLawAction.CURRENT,
+                    description="Calculate I = V / R",
+                ),
+                MenuOption(
+                    f"Resistance (R)",
+                    OhmsLawAction.RESISTANCE,
+                    description="Calculate R = V / I",
+                ),
+                MenuOption(
+                    "Electric Power (P)",
+                    OhmsLawAction.POWER,
+                    description="Calculate P = V×I | I²R | V²/R",
+                ),
             ),
             allow_back=True,
         )

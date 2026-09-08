@@ -66,13 +66,13 @@ class TerminalUI:
 
         self.clear()
         self._render_header()
-        self.console.print(Align.center(Text(title, style=Styles.SUBHEADER)))
+        self.console.print(Align.center(Text(f"── {title} ──", style=Styles.SUBHEADER)))
         self.console.print()
 
         menu_group = Group(
             *(
                 ArrowMenu.option_text(
-                    option.label, index == selected_index
+                    option, index == selected_index
                 )
                 for index, option in enumerate(options)
             )
@@ -80,21 +80,25 @@ class TerminalUI:
         self.console.print(
             Panel(
                 menu_group,
-                border_style="bright_blue",
-                box=box.SQUARE,
-                padding=(1, 3),
+                border_style=Styles.BORDER,
+                box=box.ROUNDED,
+                padding=(1, 2),
                 width=SEPARATOR_WIDTH,
             )
         )
-        self.console.print(
-            Align.center(
-                Text(
-                    "Use Arrow Keys  |  Enter = Select  |  "
-                    "Esc = Back  |  Q = Exit",
-                    style=Styles.MUTED,
-                )
-            )
-        )
+        self.console.print()
+
+        footer = Text()
+        footer.append(" [", style="dim")
+        footer.append(" ↑/↓ ", style="bold black on bright_white")
+        footer.append("] Move   [", style="dim")
+        footer.append(" Enter ", style="bold black on bright_cyan")
+        footer.append("] Select   [", style="dim")
+        footer.append(" Esc ", style="bold black on bright_yellow")
+        footer.append("] Back   [", style="dim")
+        footer.append(" Q ", style="bold black on bright_red")
+        footer.append("] Exit", style="dim")
+        self.console.print(Align.center(footer))
 
     def render_input_screen(
         self,
@@ -105,12 +109,24 @@ class TerminalUI:
 
         self.clear()
         self._render_header()
-        self.console.print(Text(title, style=Styles.SUBHEADER))
-        self.console.print("-" * SEPARATOR_WIDTH, style="blue")
+
+        instr_items: list[Text] = [
+            Text(title, style=Styles.SUBHEADER),
+            Text("─" * (SEPARATOR_WIDTH - 6), style="dim cyan"),
+        ]
         for instruction in instructions:
-            self.console.print(instruction, style=Styles.MUTED)
-        if instructions:
-            self.console.print()
+            instr_items.append(Text(f" • {instruction}", style=Styles.MUTED))
+
+        self.console.print(
+            Panel(
+                Group(*instr_items),
+                border_style=Styles.BORDER,
+                box=box.ROUNDED,
+                padding=(1, 2),
+                width=SEPARATOR_WIDTH,
+            )
+        )
+        self.console.print()
 
     def read_line(
         self,
@@ -127,7 +143,7 @@ class TerminalUI:
 
         buffer: list[str] = []
         cursor = 0
-        colored_prompt = f"{Fore.CYAN}{prompt}{Style.RESET_ALL}"
+        colored_prompt = f"  {Fore.CYAN}> {prompt}{Style.RESET_ALL}"
         self._redraw_input(colored_prompt, buffer, cursor)
 
         while True:
@@ -172,28 +188,32 @@ class TerminalUI:
 
         content = Table.grid(padding=(0, 1))
         content.add_column(style="white")
-        content.add_row(Text("Calculation Complete", style=Styles.SUCCESS))
-        content.add_row(Text(result.title, style=Styles.SUBHEADER))
+        content.add_row(Text(result.title, style=Styles.SUCCESS))
+        content.add_row(Text("─" * (SEPARATOR_WIDTH - 6), style="dim green"))
         content.add_row("")
 
+        content.add_row(Text("INPUT PARAMETERS:", style=Styles.ACCENT))
         for item in result.inputs:
-            content.add_row(f"{item.label} = {item.value}")
-
+            content.add_row(Text(f"  • {item.label:<16} = {item.value}", style="bright_white"))
         content.add_row("")
-        content.add_row(Text("Calculation Steps", style="bold yellow"))
+
+        content.add_row(Text("CALCULATION STEPS:", style=Styles.SUBHEADER))
         for step in result.steps:
-            content.add_row(step)
-
+            content.add_row(Text(f"  > {step}", style="yellow"))
         content.add_row("")
-        content.add_row(Text("-" * 30, style="blue"))
-        content.add_row(Text(result.result_label, style="bold white"))
-        content.add_row(Text(result.result_value, style=Styles.VALUE))
+
+        content.add_row(Text("═" * (SEPARATOR_WIDTH - 6), style="dim green"))
+        res_badge = Text()
+        res_badge.append(f" {result.result_label}: ", style="bold bright_white")
+        res_badge.append(f" {result.result_value} ", style="bold black on bright_green")
+        content.add_row(Align.center(res_badge))
+        content.add_row(Text("═" * (SEPARATOR_WIDTH - 6), style="dim green"))
 
         self.console.print(
             Panel(
                 content,
-                border_style="green",
-                box=box.DOUBLE,
+                border_style="bright_green",
+                box=box.ROUNDED,
                 padding=(1, 2),
                 width=SEPARATOR_WIDTH,
             )
@@ -207,9 +227,10 @@ class TerminalUI:
         self.console.print(
             Panel(
                 Text(message or "Invalid input.", style=Styles.ERROR),
-                title="Invalid Input",
-                border_style="red",
-                box=box.SQUARE,
+                title="[bold bright_red] Input Error [/]",
+                border_style="bright_red",
+                box=box.ROUNDED,
+                padding=(0, 2),
                 width=SEPARATOR_WIDTH,
             )
         )
@@ -221,59 +242,72 @@ class TerminalUI:
         self.clear()
         self._render_header()
         help_table = Table(
-            box=box.SIMPLE,
+            box=box.ROUNDED,
             show_header=True,
-            header_style=Styles.SUBHEADER,
+            header_style="bold bright_cyan",
+            border_style=Styles.BORDER,
             width=SEPARATOR_WIDTH,
         )
-        help_table.add_column("Key", width=16)
-        help_table.add_column("Action")
-        help_table.add_row("Up / Left", "Move to the previous menu item")
-        help_table.add_row("Down / Right / Tab", "Move to the next menu item")
-        help_table.add_row("Home / End", "Jump to the first / last item")
-        help_table.add_row("Enter", "Select or submit")
-        help_table.add_row("Esc", "Return to the previous menu")
-        help_table.add_row("Backspace / Delete", "Edit numeric input")
-        help_table.add_row("Q", "Exit when a menu or empty prompt is active")
-        help_table.add_row("Ctrl+C", "Exit gracefully at any time")
+        help_table.add_column("Key Shortcut", style="bold bright_white", width=22)
+        help_table.add_column("Action", style="white")
+        help_table.add_row("↑ / ↓ / Tab", "Navigate menu options")
+        help_table.add_row("Home / End", "Jump to first / last item")
+        help_table.add_row("Enter", "Select option / Calculate")
+        help_table.add_row("Esc", "Return to previous screen")
+        help_table.add_row("Backspace / Delete", "Edit text & numeric values")
+        help_table.add_row("Q", "Exit active menu / screen")
+        help_table.add_row("Ctrl+C", "Exit application gracefully")
 
         self.console.print(help_table)
         self.console.print()
-        self.console.print(
-            "Resistance values cannot be negative. Parallel resistance "
-            "values must be greater than zero.",
-            style=Styles.WARNING,
+
+        formula_table = Table(
+            box=box.ROUNDED,
+            show_header=True,
+            header_style="bold bright_yellow",
+            border_style="yellow",
+            width=SEPARATOR_WIDTH,
         )
-        self.console.print(
-            "For power, enter any supported pair: V + I, I + R, or V + R. "
-            "Leave unknown values blank.",
-            style=Styles.MUTED,
-        )
+        formula_table.add_column("Circuit / Law", style="bold bright_white", width=22)
+        formula_table.add_column("Formula Reference", style="bright_cyan")
+        formula_table.add_row("Series Resistance", f"Req = R₁ + R₂ + R₃ + ... ({OHM_SYMBOL})")
+        formula_table.add_row("Parallel Resistance", f"1/Req = 1/R₁ + 1/R₂ + ... ({OHM_SYMBOL})")
+        formula_table.add_row("Ohm's Law (V)", "V = I × R  (Voltage)")
+        formula_table.add_row("Ohm's Law (I)", "I = V / R  (Current)")
+        formula_table.add_row("Ohm's Law (R)", f"R = V / I  (Resistance in {OHM_SYMBOL})")
+        formula_table.add_row("Electric Power (P)", "P = V × I  |  P = I² × R  |  P = V² / R")
+
+        self.console.print(formula_table)
         self.pause()
 
     def show_goodbye(self) -> None:
         """Clear the screen and print the final exit message."""
 
         self.clear()
+        goodbye_text = Text()
+        goodbye_text.append("Thank you for using Electrical Calculator!\n", style="bold bright_green")
+        goodbye_text.append("Have a great day analyzing circuits.", style="dim white")
         self.console.print(
             Panel(
-                Align.center(
-                    Text(
-                        "Thank you for using Electrical Calculator.",
-                        style=Styles.SUCCESS,
-                    )
-                ),
-                border_style="bright_blue",
-                box=box.DOUBLE,
+                Align.center(goodbye_text),
+                border_style=Styles.BORDER,
+                box=box.ROUNDED,
+                padding=(1, 2),
                 width=SEPARATOR_WIDTH,
             )
         )
 
-    def pause(self, message: str = "Press any key...") -> None:
+    def pause(self, message: str = "Press any key to continue...") -> None:
         """Pause while still honoring global exit controls."""
 
         self.console.print()
-        self.console.print(message, style=Styles.MUTED, end="")
+        prompt_text = Text()
+        prompt_text.append(" [", style="dim")
+        prompt_text.append(" Press Any Key ", style="bold black on bright_white")
+        prompt_text.append("] to continue... (or ", style="dim")
+        prompt_text.append("Q", style="bold bright_red")
+        prompt_text.append(" to exit)", style="dim")
+        self.console.print(Align.center(prompt_text))
         key_press = self.key_reader.read_key()
         self.console.print()
 
@@ -286,16 +320,20 @@ class TerminalUI:
             raise ApplicationExit
 
     def _render_header(self) -> None:
-        title = Text(f"{APP_NAME} v{APP_VERSION}", style=Styles.HEADER)
+        title = Text()
+        title.append(APP_NAME, style=Styles.HEADER)
+        title.append(f" v{APP_VERSION}", style=Styles.SUBHEADER)
+
         subtitle = Text(
-            f"Voltage  |  Current  |  Resistance ({OHM_SYMBOL})  |  Power",
+            f"Voltage (V)  •  Current (I)  •  Resistance ({OHM_SYMBOL})  •  Power (P)",
             style=Styles.MUTED,
         )
         self.console.print(
             Panel(
                 Align.center(Group(title, subtitle)),
-                border_style="bright_blue",
-                box=box.DOUBLE,
+                border_style=Styles.BORDER,
+                box=box.ROUNDED,
+                padding=(0, 2),
                 width=SEPARATOR_WIDTH,
             )
         )
